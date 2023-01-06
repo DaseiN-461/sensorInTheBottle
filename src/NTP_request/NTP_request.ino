@@ -31,8 +31,28 @@ void printLocalTime()
     timeinfo.tm_hour -= 4;
   }
   */
+  int h = timeinfo.tm_hour;
+  int m = timeinfo.tm_min;
+
+  char buf_h[4];
+  char buf_m[4];
+
+  itoa(h,buf_h,10);
+  itoa(m,buf_m,10);
+
+  char buf[10];
+  buf[0] = buf_h[0];
+  buf[1] = buf_h[1];
+  buf[2] = buf_h[2];
+  buf[3] = buf_h[3];
+
+  buf[4] = buf_m[0];
+  buf[5] = buf_m[1];
+  buf[6] = buf_m[2];
+  buf[7] = buf_m[3];
   
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+  Serial.println(buf);
+  //Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
 }
 
 // Callback function (get's called when time adjusts via NTP)
