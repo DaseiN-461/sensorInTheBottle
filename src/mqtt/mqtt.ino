@@ -5,7 +5,7 @@
 #include "sntp.h"
 
 #define uS_TO_S_FACTOR 1000000ULL
-#define TIME_TO_SLEEP 30 //1800 = 30 minutes
+#define TIME_TO_SLEEP 30 //in seconds,      1800 = 30 minutes
 
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "time.nist.gov";
@@ -30,6 +30,7 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 void setup() {
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   Serial.begin(115200);
 
   setup_wifi();
@@ -102,7 +103,7 @@ void reconnect() {
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
-      delay(5000);
+      delay(100);
     }
   }
 }
@@ -112,9 +113,7 @@ void loop() {
   }
   client.loop();
 
-  long now = millis();
-  if (now - lastMsg > 5000) {
-    lastMsg = now;
+  
 
     struct tm timeinfo;
     if(!getLocalTime(&timeinfo)){
@@ -123,23 +122,44 @@ void loop() {
     }
     
     char hora[2];
-    itoa(timeinfo.tm_hour,hora,10);
-    char minu[2];
-    itoa(timeinfo.tm_min,hora,10);
+    int h = timeinfo.tm_hour;
+    itoa(h,hora,10);
 
-    char dataString[5];
+    char minu[2];
+    int m = timeinfo.tm_min;
+    itoa(m,minu,10);
+
+    if(h<10){
+      hora[1] = hora[0];
+      hora[0] = '0';
+    }
+
+    if(m<10){
+      minu[1] = minu[0];
+      minu[0] = '0';
+    }
+
+    char dataString[6];
+
     dataString[0] = hora[0];
     dataString[1] = hora[1];
 
     dataString[2] = ':';
+    
     dataString[3] = minu[0];
     dataString[4] = minu[1];
+
+    dataString[5] = '\0';
 
     
  
 
     client.publish("esp32/temperature", dataString);
+    delay(500);
+
+
+    esp_deep_sleep_start();
 
   
-  }
+  
 }
