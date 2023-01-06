@@ -122,21 +122,19 @@ void loop() {
       return;
     }
     
-    char hora[4];
+    char hora[2];
     itoa(timeinfo.tm_hour,hora,10);
-    char minu[4];
+    char minu[2];
     itoa(timeinfo.tm_min,hora,10);
 
-    char dataString[20];
+    char dataString[5];
     dataString[0] = hora[0];
     dataString[1] = hora[1];
-    dataString[2] = hora[2];
-    dataString[3] = hora[3];
-    dataString[4] = ':';
-    dataString[5] = minu[0];
-    dataString[6] = minu[1];
-    dataString[7] = minu[2];
-    dataString[8] = minu[3];
+
+    dataString[2] = ':';
+    dataString[3] = minu[0];
+    dataString[4] = minu[1];
+
     
  
 
