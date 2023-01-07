@@ -26,22 +26,13 @@ int value = 0;
 float temperature = 0;
 float humidity = 0;
 
+
+char dataString[6];
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-void setup() {
-  pinMode(4,OUTPUT);
-  digitalWrite(4,HIGH);
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-  Serial.begin(115200);
 
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
-
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
-
-}
 
 void setup_wifi() {
   delay(10);
@@ -50,13 +41,33 @@ void setup_wifi() {
   Serial.print("Connecting to ");
   Serial.println(ssid);
 
+  
   WiFi.begin(ssid, password);
-
+  int count = 0;
   while (WiFi.status() != WL_CONNECTED) {
+
+    //////////////////////////////////////////////////////////////////////////////
+    // debugging, for no conection loop
+    //////////////////////////////////////////////////////////////////////////////
+    count += 1;
     delay(500);
     Serial.print(".");
+    if(count == 10){
+      bool flag = false;
+      for(int i=0; i<12; i++){
+        flag = !flag;
+        digitalWrite(4,flag);
+        delay(50);
+      }
+      esp_restart();
+    }
+    //////////////////////////////////////////////////////////////////////////////
   }
 
+  
+
+
+  
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
@@ -105,64 +116,105 @@ void reconnect() {
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
-      delay(100);
+      delay(5000);
     }
   }
 }
+
+
+void updateStringToSend(){
+          struct tm timeinfo;
+          if(!getLocalTime(&timeinfo)){
+                  Serial.println("No time available (yet)");
+                  return;
+          }
+          
+          char hora[2];
+          int h = timeinfo.tm_hour;
+          itoa(h,hora,10);
+      
+          char minu[2];
+          int m = timeinfo.tm_min;
+          itoa(m,minu,10);
+      
+          if(h<10){
+                  hora[1] = hora[0];
+                  hora[0] = '0';
+          }
+      
+          if(m<10){
+                  minu[1] = minu[0];
+                  minu[0] = '0';
+          }
+      
+          
+      
+          dataString[0] = hora[0];
+          dataString[1] = hora[1];
+      
+          dataString[2] = ':';
+          
+          dataString[3] = minu[0];
+          dataString[4] = minu[1];
+      
+          dataString[5] = '\0';
+
+}
+
+
+void setup() {
+        pinMode(4,OUTPUT);
+        digitalWrite(4,HIGH);
+        
+        esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+        Serial.begin(115200);
+      
+        setup_wifi();
+        client.setServer(mqtt_server, 1883);
+        client.setCallback(callback);
+      
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+      
+        int count = 0;
+        while (!client.connected()) {
+                reconnect();
+                if(count == 10){
+                  bool flag = false;
+                  for(int i=0; i<6; i++){
+                    flag = !flag;
+                    digitalWrite(4,flag);
+                    delay(50);
+                  }
+                  esp_restart();
+                }
+        }
+
+        //conection is ready to get and send data
+        digitalWrite(4,LOW);
+        client.loop();
+      
+        //update time by ntp service
+        updateStringToSend();
+
+        //publish data by mqtt
+        client.publish("esp32/temperature", dataString);
+        delay(500);
+
+        // SUCCESSFULLY ADVERTISMENT
+        bool flag = false;
+        for(int i=0; i<6; i++){
+              flag = !flag;
+              digitalWrite(4,flag);
+              delay(500);
+        }
+        digitalWrite(4,HIGH);
+
+        
+        //goto sleep
+        esp_deep_sleep_start();
+
+}
+
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
-  digitalWrite(4,LOW);
-  client.loop();
-
-  
-
-    struct tm timeinfo;
-    if(!getLocalTime(&timeinfo)){
-      Serial.println("No time available (yet)");
-      return;
-    }
     
-    char hora[2];
-    int h = timeinfo.tm_hour;
-    itoa(h,hora,10);
-
-    char minu[2];
-    int m = timeinfo.tm_min;
-    itoa(m,minu,10);
-
-    if(h<10){
-      hora[1] = hora[0];
-      hora[0] = '0';
-    }
-
-    if(m<10){
-      minu[1] = minu[0];
-      minu[0] = '0';
-    }
-
-    char dataString[6];
-
-    dataString[0] = hora[0];
-    dataString[1] = hora[1];
-
-    dataString[2] = ':';
-    
-    dataString[3] = minu[0];
-    dataString[4] = minu[1];
-
-    dataString[5] = '\0';
-
-    
- 
-
-    client.publish("esp32/temperature", dataString);
-    delay(500);
-
-
-    esp_deep_sleep_start();
-
-  
-  
 }
