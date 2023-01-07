@@ -30,6 +30,8 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 void setup() {
+  pinMode(4,OUTPUT);
+  digitalWrite(4,HIGH);
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   Serial.begin(115200);
 
@@ -111,6 +113,7 @@ void loop() {
   if (!client.connected()) {
     reconnect();
   }
+  digitalWrite(4,LOW);
   client.loop();
 
   
