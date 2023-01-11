@@ -1,3 +1,4 @@
+#include <ESP32Time.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
 
@@ -5,7 +6,10 @@
 #include "sntp.h"
 
 #define uS_TO_S_FACTOR 1000000ULL
-#define TIME_TO_SLEEP 30 //in seconds,      1800 = 30 minutes
+#define TIME_TO_SLEEP 60 //in seconds,      1800 = 30 minutes
+
+RTC_DATA_ATTR bool firstBoot = true;
+RTC_DATA_ATTR bool NPT_update = false;
 
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "time.nist.gov";
@@ -31,11 +35,11 @@ char dataString[6];
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+ESP32Time rtc;
 
 
 
-void setup_wifi() {
-  delay(10);
+void try_wifi() {
   // We start by connecting to a WiFi network
   Serial.println();
   Serial.print("Connecting to ");
@@ -114,91 +118,76 @@ void reconnect() {
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
+      Serial.println(" try again in 1 seconds");
+      // Wait 1 seconds before retrying
+      delay(1000);
     }
   }
 }
 
-
-void updateStringToSend(){
-          struct tm timeinfo;
-          if(!getLocalTime(&timeinfo)){
-                  Serial.println("No time available (yet)");
-                  return;
-          }
-          
-          char hora[2];
-          int h = timeinfo.tm_hour;
-          itoa(h,hora,10);
-      
-          char minu[2];
-          int m = timeinfo.tm_min;
-          itoa(m,minu,10);
-      
-          if(h<10){
-                  hora[1] = hora[0];
-                  hora[0] = '0';
-          }
-      
-          if(m<10){
-                  minu[1] = minu[0];
-                  minu[0] = '0';
-          }
-      
-          
-      
-          dataString[0] = hora[0];
-          dataString[1] = hora[1];
-      
-          dataString[2] = ':';
-          
-          dataString[3] = minu[0];
-          dataString[4] = minu[1];
-      
-          dataString[5] = '\0';
-
-}
 
 
 void setup() {
         pinMode(4,OUTPUT);
         digitalWrite(4,HIGH);
         
-        esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+        
         Serial.begin(115200);
-      
-        setup_wifi();
+        
         client.setServer(mqtt_server, 1883);
         client.setCallback(callback);
+
+        
       
-        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
-      
-        int count = 0;
-        while (!client.connected()) {
-                reconnect();
-                if(count == 10){
-                  bool flag = false;
-                  for(int i=0; i<6; i++){
-                    flag = !flag;
-                    digitalWrite(4,flag);
-                    delay(50);
+        try_wifi();
+
+        if(WiFi.status() == WL_CONNECTED){
+                  if(firstBoot or !NPT_update){
+                            time_NTP_update();
+                            firstBoot = false;
                   }
-                  esp_restart();
-                }
         }
-
-        //conection is ready to get and send data
-        digitalWrite(4,LOW);
-        client.loop();
+        
+        
       
-        //update time by ntp service
-        updateStringToSend();
+        
+       
+     
+        
+        
 
+        
+        
+        
+ 
+        ////////////////////////////// get time to tag the measures
+        char bufToSend[20];
+        String cadena = rtc.getTime("%d/%m/%Y  %H:%M:%S");
+        strcpy(bufToSend, cadena.c_str());
+
+
+        //////////////////////////// Intenta connectarse a broker mqtt  ////////////////////////////////////
         //publish data by mqtt
-        client.publish("esp32/temperature", dataString);
-        delay(500);
+        int count = 0;
+        int timeout_mqtt = 5;
+        while(count<timeout_mqtt and !client.connected()){
+          reconnect();
+          count += 1;
+        }
+        if(client.connected()){
+                //conection is ready to get and send data
+                ////////////////////////////Aquí debería vaciar el buffer FIFO////////////////////////////////////
+                digitalWrite(4,LOW);
+                client.loop();
+                client.publish("esp32/temperature", cadena.c_str());
+        }else{
+          Serial.println("\n ERROR ENVIANDO POR MQTT");
+
+          //Añadir  la muestra a la cola FIFO
+        }
+        
+
 
         // SUCCESSFULLY ADVERTISMENT
         bool flag = false;
@@ -209,12 +198,26 @@ void setup() {
         }
         digitalWrite(4,HIGH);
 
-        
+        ////////////////////////////Calcula el tiempo restante para dormir
+        int t = TIME_TO_SLEEP - rtc.getSecond();
         //goto sleep
+        esp_sleep_enable_timer_wakeup(t * uS_TO_S_FACTOR);
         esp_deep_sleep_start();
 
 }
 
 void loop() {
     
+}
+
+void time_NTP_update(){              
+        struct tm timeinfo;
+      
+        if(!getLocalTime(&timeinfo)){
+                Serial.println("No time available (yet)");
+        }else{
+                rtc.setTimeStruct(timeinfo);
+                Serial.println("NTP update successfully");
+                NPT_update = true;
+        }
 }
