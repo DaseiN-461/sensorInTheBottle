@@ -1,12 +1,14 @@
 #include <ESP32Time.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <EEPROM.h>
 
 #include "time.h"
 #include "sntp.h"
 
+#define MINU_TO_SLEEP 5
 #define uS_TO_S_FACTOR 1000000ULL
-#define TIME_TO_SLEEP 60 //in seconds,      1800 = 30 minutes
+#define TIME_TO_SLEEP MINU_TO_SLEEP*60 //in seconds,      1800 = 30 minutes
 
 RTC_DATA_ATTR bool firstBoot = true;
 RTC_DATA_ATTR bool NPT_update = false;
@@ -31,7 +33,7 @@ float temperature = 0;
 float humidity = 0;
 
 
-char dataString[6];
+String buf_data;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -48,23 +50,18 @@ void try_wifi() {
   
   WiFi.begin(ssid, password);
   int count = 0;
-  while (WiFi.status() != WL_CONNECTED) {
+  int timeout_wifi = 10;
+  while (WiFi.status() != WL_CONNECTED and count<timeout_wifi) {
 
     //////////////////////////////////////////////////////////////////////////////
     // debugging, for no conection loop
     //////////////////////////////////////////////////////////////////////////////
-    count += 1;
-    delay(500);
+    
+    delay(100);
     Serial.print(".");
-    if(count == 10){
-      bool flag = false;
-      for(int i=0; i<12; i++){
-        flag = !flag;
-        digitalWrite(4,flag);
-        delay(50);
-      }
-      esp_restart();
-    }
+    
+    count += 1;
+
     //////////////////////////////////////////////////////////////////////////////
   }
 
@@ -125,29 +122,55 @@ void reconnect() {
   }
 }
 
-
+struct tm time_to_wake_up;
 
 void setup() {
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+        if(!firstBoot){
+          time_to_wake_up = rtc.getTimeStruct();
+
+          ////////////////////////////// get time to tag the measures
+        
+          buf_data = rtc.getTime("%d/%m/%Y  %H:%M:%S");
+
+        // contruir buf data con time tag y medicion
+
+        }
+  
+        
+
+        Serial.begin(115200);
+        Serial.print("Wake up time: ");
+        Serial.println(buf_data);
+        
         pinMode(4,OUTPUT);
         digitalWrite(4,HIGH);
         
-        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
         
-        Serial.begin(115200);
+        
+        
         
         client.setServer(mqtt_server, 1883);
         client.setCallback(callback);
 
         
-      
-        try_wifi();
-
-        if(WiFi.status() == WL_CONNECTED){
-                  if(firstBoot or !NPT_update){
-                            time_NTP_update();
-                            firstBoot = false;
-                  }
+        if(firstBoot){
+          
+            Serial.println("FIRST BOOT...");
+            firstBoot = false;
+            while(WiFi.status() != WL_CONNECTED){
+              try_wifi();
+            }
+            
+            time_NTP_update();
+        }else{
+          try_wifi();
         }
+
+      
+        
+
+     
         
         
       
@@ -161,13 +184,72 @@ void setup() {
         
         
  
-        ////////////////////////////// get time to tag the measures
-        char bufToSend[20];
-        String cadena = rtc.getTime("%d/%m/%Y  %H:%M:%S");
-        strcpy(bufToSend, cadena.c_str());
+        
 
 
-        //////////////////////////// Intenta connectarse a broker mqtt  ////////////////////////////////////
+        if(WiFi.status() == WL_CONNECTED){
+          try_mqtt();
+          
+        }else{
+          EEPROM.begin(20);
+          int cant = int(EEPROM.read(0));
+            //Si no hay muestras, empieza a guardarlas desde la segunda posicion de la memoria
+            // la primera guarda la cantidad de muestras guardadas
+            EEPROM.write(1+cant,rtc.getMinute());
+            EEPROM.write(0,cant+1);
+  
+            EEPROM.commit();
+        }
+
+        
+        
+        
+
+        ////////////////////////////Calcula el tiempo restante para dormir
+        Serial.print("Time at sleep: ");
+        Serial.println(rtc.getTime("%d/%m/%Y  %H:%M:%S"));
+        
+        struct tm time_at_sleep = rtc.getTimeStruct();
+       
+        
+        //goto sleep
+        int t = 0;
+        int minu = 0;
+        if(time_at_sleep.tm_min%10 != 0){
+          minu = 10 - (time_at_sleep.tm_min%10) - 1;
+        }else{
+          minu = 9;
+        }
+
+        int seco = 60 - time_at_sleep.tm_sec;
+        
+        t = (seco* uS_TO_S_FACTOR)+(minu*60*uS_TO_S_FACTOR);
+        Serial.print("\n\n Durmiendo por: ");
+        Serial.println(t/1000000);
+        esp_sleep_enable_timer_wakeup(t);
+        esp_deep_sleep_start();
+
+}
+
+void loop() {
+    
+}
+
+void time_NTP_update(){       
+               
+        struct tm timeinfo;
+      
+        while(!getLocalTime(&timeinfo)){
+                Serial.println("No time available (yet)");
+        }
+        rtc.setTimeStruct(timeinfo);
+        Serial.println("NTP update successfully");
+        NPT_update = true;
+        
+}
+
+void try_mqtt(){
+  //////////////////////////// Intenta connectarse a broker mqtt  ////////////////////////////////////
         //publish data by mqtt
         int count = 0;
         int timeout_mqtt = 5;
@@ -175,17 +257,61 @@ void setup() {
           reconnect();
           count += 1;
         }
-        if(client.connected()){
+
+        
+        EEPROM.begin(20);
+          if(client.connected()){
                 //conection is ready to get and send data
                 ////////////////////////////Aquí debería vaciar el buffer FIFO////////////////////////////////////
                 digitalWrite(4,LOW);
                 client.loop();
-                client.publish("esp32/temperature", cadena.c_str());
-        }else{
-          Serial.println("\n ERROR ENVIANDO POR MQTT");
 
-          //Añadir  la muestra a la cola FIFO
-        }
+                
+
+                //vaciando el buffer
+                uint8_t cant = EEPROM.read(0);
+                if(cant>0){
+                        Serial.println("\n vaciar buffer");
+                        Serial.print("Cantidad: ");
+                        Serial.print(cant);
+                        Serial.println();
+
+                        for(int i=0; i<cant; i++){
+                          Serial.println(int(EEPROM.read(cant-i)));
+                              char buf[2];
+                              itoa(int(EEPROM.read(i+1)), buf, 10);
+                              client.publish("esp32/temperature",buf);
+                              
+                          
+                        }
+                        cant = 0;
+                        EEPROM.write(0,cant);
+                        EEPROM.commit();
+
+                }
+
+                //Deberia publicar ahora la última muestra/////////////////////////////
+                
+                //publica la fecha
+                client.publish("esp32/temperature", buf_data.c_str());
+                
+          }else{
+            Serial.println("\n ERROR ENVIANDO POR MQTT");
+  
+            //Añadir  la muestra a la cola FIFO
+            
+  
+            int cant = int(EEPROM.read(0));
+            //Si no hay muestras, empieza a guardarlas desde la segunda posicion de la memoria
+            // la primera guarda la cantidad de muestras guardadas
+            EEPROM.write(1+cant,rtc.getMinute());
+            EEPROM.write(0,cant+1);
+  
+            EEPROM.commit();
+  
+          }
+        
+        
         
 
 
@@ -197,27 +323,4 @@ void setup() {
               delay(500);
         }
         digitalWrite(4,HIGH);
-
-        ////////////////////////////Calcula el tiempo restante para dormir
-        int t = TIME_TO_SLEEP - rtc.getSecond();
-        //goto sleep
-        esp_sleep_enable_timer_wakeup(t * uS_TO_S_FACTOR);
-        esp_deep_sleep_start();
-
-}
-
-void loop() {
-    
-}
-
-void time_NTP_update(){              
-        struct tm timeinfo;
-      
-        if(!getLocalTime(&timeinfo)){
-                Serial.println("No time available (yet)");
-        }else{
-                rtc.setTimeStruct(timeinfo);
-                Serial.println("NTP update successfully");
-                NPT_update = true;
-        }
 }
