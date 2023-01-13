@@ -6,9 +6,9 @@
 #include "time.h"
 #include "sntp.h"
 
-#define MINU_TO_SLEEP 5
+
 #define uS_TO_S_FACTOR 1000000ULL
-#define TIME_TO_SLEEP MINU_TO_SLEEP*60 //in seconds,      1800 = 30 minutes
+
 
 RTC_DATA_ATTR bool firstBoot = true;
 RTC_DATA_ATTR bool NPT_update = false;
@@ -25,6 +25,7 @@ const char* ssid = "spending_net";
 const char* password = "spending_pass";
 
 const char* mqtt_server = "mqtt.eclipseprojects.io";
+const char* topic = "";
 
 long lastMsg = 0;
 char msg[100];
@@ -91,23 +92,10 @@ void callback(char* topic, byte* message, unsigned int length) {
     messageTemp += (char)message[i];
   }
   Serial.println();
-/*
-  // Feel free to add more if statements to control more GPIOs with MQTT
 
-  // If a message is received on the topic esp32/output, you check if the message is either "on" or "off". 
-  // Changes the output state according to the message
-  if (String(topic) == "esp32/output") {
-    Serial.print("Changing output to ");
-    if(messageTemp == "on"){
-      Serial.println("on");
-    }
-    else if(messageTemp == "off"){
-      Serial.println("off");
-    }
-  }
-*/
 }
 
+// intenta reconectar el cliente mqtt
 void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
@@ -122,7 +110,7 @@ void reconnect() {
       Serial.print(client.state());
       Serial.println(" try again in 1 seconds");
       // Wait 1 seconds before retrying
-      delay(1000);
+      delay(500);
     }
   }
 }
@@ -156,8 +144,7 @@ void setup() {
         Serial.print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Wake up Time: ");
           Serial.println(buf_data);
         
-        pinMode(4,OUTPUT);
-        digitalWrite(4,HIGH);
+        
         
         
         
@@ -190,7 +177,7 @@ void setup() {
           
         }else{
             Serial.println(" %%%%%%%%%%%%%%%%%%%%%%% SAVE DATA IN NO VOLATILE MEMORY $$$$$$$$$$$$$$$$$$");
-            EEPROM.begin(20);
+            EEPROM.begin(500);
             int cant = int(EEPROM.read(0));
             //Si no hay muestras, empieza a guardarlas desde la segunda posicion de la memoria
             // la primera guarda la cantidad de muestras guardadas
@@ -269,7 +256,7 @@ void try_mqtt(){
                 Serial.println("\n------------------ MQTT BROKER CONNECTION SUCCESSFULLY !!!!!!!");
                 //conection is ready to get and send data
                 ////////////////////////////Aquí debería vaciar el buffer FIFO////////////////////////////////////
-                digitalWrite(4,LOW);
+                
                 client.loop();
 
                 
@@ -277,18 +264,18 @@ void try_mqtt(){
                 //vaciando el buffer
                 uint8_t cant = EEPROM.read(0);
                 if(cant>0){
-                        Serial.println("\n vaciar buffer");
-                        Serial.print("Cantidad: ");
-                        Serial.print(cant);
-                        Serial.println();
+                        Serial.println("\n Vaciando buffer");
+                        Serial.printf("Cantidad: [%i]\n",cant);
 
+                        
                         for(int i=0; i<cant; i++){
-                          Serial.println(int(EEPROM.read(cant-i)));
+                              //Si la cantidad de tiempo restante 
+                          
+                              Serial.println(int(EEPROM.read(cant-i)));
                               char buf[2];
                               itoa(int(EEPROM.read(i+1)), buf, 10);
-                              client.publish("esp32/ttgo",buf);
-                              
-                          
+                              client.publish(topic,buf);
+   
                         }
                         cant = 0;
                         EEPROM.write(0,cant);
@@ -316,18 +303,4 @@ void try_mqtt(){
             EEPROM.commit();
   
           }
-        
-        
-        
-
-/*
-        // SUCCESSFULLY ADVERTISMENT
-        bool flag = false;
-        for(int i=0; i<6; i++){
-              flag = !flag;
-              digitalWrite(4,flag);
-              delay(500);
-        }
-        digitalWrite(4,HIGH);
-*/
 }
