@@ -21,11 +21,11 @@ const int   daylightOffset_sec = 0;
 const char* time_zone = "CET-1CEST,M3.5.0,M10.5.0/3";  // TimeZone rule for Europe/Rome including daylight adjustment rules (optional)
 
 
-const char* ssid = "spending_net";
-const char* password = "spending_pass";
+const char* ssid = "Rines12345";
+const char* password = "203462646";
 
 const char* mqtt_server = "mqtt.eclipseprojects.io";
-const char* topic = "";
+const char* topic = "cocoHouse/";
 
 long lastMsg = 0;
 char msg[100];
@@ -286,7 +286,7 @@ void try_mqtt(){
                 //Deberia publicar ahora la última muestra/////////////////////////////
                 
                 //publica la fecha
-                client.publish("esp32/ttgo", buf_data.c_str());
+                client.publish(topic, buf_data.c_str());
                 
           }else{
             Serial.println("\n ---------------  ERROR ENVIANDO POR MQTT   !!!!");
