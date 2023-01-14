@@ -2,10 +2,15 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <EEPROM.h>
+#include <DHT.h>
 
 //#include "time.h"
 //#include "sntp.h"
 
+#define DHTTYPE DHT22   
+#define DHTPIN 2 
+
+DHT dht(DHTPIN, DHTTYPE);
 
 #define uS_TO_S_FACTOR 1000000ULL
 #define timeout_wifi 10 // 10 intentos cada 100 ms
@@ -27,9 +32,7 @@ const char* ssid = "spending_net";
 const char* password = "spending_pass";
 
 const char* mqtt_server = "mqtt.eclipseprojects.io";
-const char* topic = "frankHouse/";
-
-
+const char* topic = "esp32/temperature";
 
 
 
@@ -112,20 +115,56 @@ void reconnect() {
   }
 }
 
+String get_measures(){
+        dht.begin();
+        delay(10);
+
+        float hum = dht.readHumidity();
+        float temp = dht.readTemperature();
+      
+        if (isnan(hum) || isnan(temp)) {
+          Serial.println("Error al leer el sensor DHT22");
+        } else {
+          Serial.print("Humedad: ");
+          Serial.print(hum);
+          Serial.print(" %, Temperatura: ");
+          Serial.print(temp);
+          Serial.println(" °C ");
+        }
+
+    
+        
+        String measures;
+        measures = "temp: " + String(temp,1) + ", hum: " + String(hum,1);
+        
+        return measures;
+
+        
+}
+
 
 
 void setup() {
         
         //Aquí debe tomar la muestra ////////////##################################//////////////////////////////
 
-        String measure = "Measure";
+        
 
         struct tm time_to_wake_up;
 
         
         String str_wakeup_time;
         struct tm tm_wakeup_time;
+
+
+        String frame;
+        
         if(!firstBoot){
+          
+          
+          String measures = get_measures();
+          
+          
           tm_wakeup_time = rtc.getTimeStruct();
 
           ////////////////////////////// get time to tag the measures
@@ -133,7 +172,7 @@ void setup() {
           str_wakeup_time = rtc.getTime("%d/%m/%Y  %H:%M:%S");
           
         // contruir buf data con time tag y medicion
-
+          frame = "["+str_wakeup_time+"][" + measures+"]";
         }
 
       
@@ -171,7 +210,7 @@ void setup() {
         
         if(WiFi.status() == WL_CONNECTED){
           Serial.println(" $$$$$$$$$$$$$$$$ TRY SEND DATA TO MQTT BROKER ==================== <<<<<<<<<<<");
-          try_mqtt(str_wakeup_time);
+          try_mqtt(frame);
           
         }else{
 
@@ -205,9 +244,20 @@ void setup() {
         //goto sleep
         
 
-        int seco = 60 - time_at_sleep.tm_sec;
+        int t = 0;
+        int minu = 0;
         
-        int t = seco* uS_TO_S_FACTOR;
+        if(time_at_sleep.tm_min%10 != 0){
+          minu = 10 - (time_at_sleep.tm_min%10) - 1;
+        }else{
+          minu = 9;
+        }
+
+
+        int seco = 60 - time_at_sleep.tm_sec;
+
+        t = (seco* uS_TO_S_FACTOR)+(minu*60*uS_TO_S_FACTOR);
+   
 
         Serial.println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
         
