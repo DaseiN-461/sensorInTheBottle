@@ -202,6 +202,13 @@ void setup() {
                 //Actualiza los relojes de acuerdo a los servicios NTP
                 configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
                 time_NTP_update();
+
+                //Informa al servidor por medio de una publicacion en un topic mqtt
+                // para que el servidor comience a registrar los datos
+                
+                //try_mqtt(topic);
+
+                //corregir funcion topic para que envíe a un topic especial donde escucha el servidor
             
         //Si no es la primera vez intenta conectarse a wifi, pero un timeout asegura no bloquear mas de eso
         }else{
