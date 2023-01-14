@@ -13,7 +13,7 @@
 DHT dht(DHTPIN, DHTTYPE);
 
 #define uS_TO_S_FACTOR 1000000ULL
-#define timeout_wifi 10 // 10 intentos cada 100 ms
+#define timeout_wifi 5 // 5 intentos cada 500 ms
 #define timeout_mqtt 5 // 5 intentos cada 500 ms
 
 
@@ -27,12 +27,17 @@ const int   daylightOffset_sec = 0;
 
 const char* time_zone = "CET-1CEST,M3.5.0,M10.5.0/3";  // TimeZone rule for Europe/Rome including daylight adjustment rules (optional)
 
+/*
+const char* ssid = "wifitelsur_CBV";
+const char* password = "218709915";
+*/
 
 const char* ssid = "spending_net";
 const char* password = "spending_pass";
 
+
 const char* mqtt_server = "mqtt.eclipseprojects.io";
-const char* topic = "esp32/temperature";
+const char* topic = "esp32/test";
 
 
 
@@ -54,7 +59,7 @@ void try_wifi() {
   
   int count = 0;
   while (WiFi.status() != WL_CONNECTED and count<timeout_wifi) {
-    delay(100);
+    delay(500);
     Serial.print(".");
     
     count += 1;
@@ -254,11 +259,13 @@ void setup() {
 
         int t = 0;
         int minu = 0;
+
+        int timer = 5; //timer in minutes
         
-        if(time_at_sleep.tm_min%10 != 0){
-          minu = 10 - (time_at_sleep.tm_min%10) - 1;
+        if(time_at_sleep.tm_min%timer != 0){
+          minu = timer - (time_at_sleep.tm_min%timer) - 1;
         }else{
-          minu = 9;
+          minu = timer - 1;
         }
 
 
