@@ -16,6 +16,8 @@ DHT dht(DHTPIN, DHTTYPE);
 #define timeout_wifi 5 // 5 intentos cada 500 ms
 #define timeout_mqtt 5 // 5 intentos cada 500 ms
 
+#define timer 10 //timer in minutes
+
 
 RTC_DATA_ATTR bool firstBoot = true;
 RTC_DATA_ATTR bool NPT_update = false;
@@ -37,7 +39,7 @@ const char* password = "spending_pass";
 
 
 const char* mqtt_server = "mqtt.eclipseprojects.io";
-const char* topic = "esp32/test";
+const char* topic = "esp32/temperature";
 
 
 
@@ -149,8 +151,9 @@ String get_measures(){
 
 
 
+
 void setup() {
-        
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
         //Aquí debe tomar la muestra ////////////##################################//////////////////////////////
 
         
@@ -180,11 +183,12 @@ void setup() {
           frame = "["+str_wakeup_time+"][" + measures+"]";
         }
 
-      
-  
+        
+        
         
 
         Serial.begin(115200);
+        
         Serial.println("############$$$$$$$$$$$$$$$$$$$$############$$$$$$$$$$$$##########$$$$$$$$$$$$");
         Serial.println("############$$$$$$$$$$$$$$$$$$$$############$$$$$$$$$$$$##########$$$$$$$$$$$$");
         Serial.println("############$$$$$$$$$$$$$$$$$$$$############$$$$$$$$$$$$##########$$$$$$$$$$$$");
@@ -205,7 +209,7 @@ void setup() {
                 }
                 
                 //Actualiza los relojes de acuerdo a los servicios NTP
-                configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+                                
                 time_NTP_update();
 
                 //Informa al servidor por medio de una publicacion en un topic mqtt
@@ -260,7 +264,7 @@ void setup() {
         int t = 0;
         int minu = 0;
 
-        int timer = 5; //timer in minutes
+         
         
         if(time_at_sleep.tm_min%timer != 0){
           minu = timer - (time_at_sleep.tm_min%timer) - 1;
