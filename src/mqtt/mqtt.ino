@@ -200,6 +200,7 @@ void setup() {
                 }
                 
                 //Actualiza los relojes de acuerdo a los servicios NTP
+                configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
                 time_NTP_update();
             
         //Si no es la primera vez intenta conectarse a wifi, pero un timeout asegura no bloquear mas de eso
@@ -277,7 +278,7 @@ void loop() {
 }
 
 void time_NTP_update(){       
-        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+        
         
         struct tm timeinfo;
       
@@ -302,7 +303,7 @@ void try_mqtt(String bufferToSendMQTT){
         }
 
         
-        EEPROM.begin(20);
+        EEPROM.begin(500);
           if(client.connected()){
                 Serial.println("\n------------------ MQTT BROKER CONNECTION SUCCESSFULLY !!!!!!!");
                 //conection is ready to get and send data
