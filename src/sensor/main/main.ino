@@ -16,7 +16,7 @@ DHT dht(DHTPIN, DHTTYPE);
 #define timeout_wifi 5 // 5 intentos cada 500 ms
 #define timeout_mqtt 5 // 5 intentos cada 500 ms
 
-#define timer 10 //timer in minutes
+#define timer 1 //timer in minutes
 
 
 RTC_DATA_ATTR bool firstBoot = true;
@@ -39,8 +39,8 @@ const char* password = "spending_pass";
 
 
 const char* mqtt_server = "mqtt.eclipseprojects.io";
-const char* topic = "esp32/temperature";
-
+const char* topic_name = "esp32_temperature";
+const char* topic_register = "test/topics";
 
 
 
@@ -215,7 +215,7 @@ void setup() {
                 //Informa al servidor por medio de una publicacion en un topic mqtt
                 // para que el servidor comience a registrar los datos
                 
-                //try_mqtt(topic);
+                try_mqtt(topic_register, String(topic_name));
 
                 //corregir funcion topic para que envíe a un topic especial donde escucha el servidor
             
@@ -226,25 +226,25 @@ void setup() {
 
         
         if(WiFi.status() == WL_CONNECTED){
-          Serial.println(" $$$$$$$$$$$$$$$$ TRY SEND DATA TO MQTT BROKER ==================== <<<<<<<<<<<");
-          try_mqtt(frame);
+                Serial.println(" $$$$$$$$$$$$$$$$ TRY SEND DATA TO MQTT BROKER ==================== <<<<<<<<<<<");
+                try_mqtt(topic_name, frame);
           
         }else{
 
-            //Esto es solo por mientras, guarda el minuto en la eeprom para simular que guarda la
-            // estructura en una memoria no voltatil
-            Serial.println(" %%%%%%%%%%%%%%%%%%%%%%% SAVE DATA IN NO VOLATILE MEMORY $$$$$$$$$$$$$$$$$$");
-            EEPROM.begin(500);
-            int cant = int(EEPROM.read(0));
-            //Si no hay muestras, empieza a guardarlas desde la segunda posicion de la memoria
-            // la primera guarda la cantidad de muestras guardadas
-            EEPROM.write(1+cant,rtc.getMinute());
-            EEPROM.write(0,cant+1);
-
-            Serial.printf("queue size: [%d]\n\n", cant);
-            
-  
-            EEPROM.commit();
+                //Esto es solo por mientras, guarda el minuto en la eeprom para simular que guarda la
+                // estructura en una memoria no voltatil
+                Serial.println(" %%%%%%%%%%%%%%%%%%%%%%% SAVE DATA IN NO VOLATILE MEMORY $$$$$$$$$$$$$$$$$$");
+                EEPROM.begin(500);
+                int cant = int(EEPROM.read(0));
+                //Si no hay muestras, empieza a guardarlas desde la segunda posicion de la memoria
+                // la primera guarda la cantidad de muestras guardadas
+                EEPROM.write(1+cant,rtc.getMinute());
+                EEPROM.write(0,cant+1);
+    
+                Serial.printf("queue size: [%d]\n\n", cant);
+                
+      
+                EEPROM.commit();
         }
 
         client.disconnect();
@@ -309,7 +309,8 @@ void time_NTP_update(){
         
 }
 
-void try_mqtt(String bufferToSendMQTT){
+//topic_register
+void try_mqtt(const char * topic,String bufferToSendMQTT){
         client.setServer(mqtt_server, 1883);
         client.setCallback(callback);
   //////////////////////////// Intenta connectarse a broker mqtt  ////////////////////////////////////
