@@ -13,8 +13,10 @@
 DHT dht(DHTPIN, DHTTYPE);
 
 #define uS_TO_S_FACTOR 1000000ULL
-#define timeout_wifi 10 // 10 intentos cada 100 ms
+#define timeout_wifi 5 // 5 intentos cada 500 ms
 #define timeout_mqtt 5 // 5 intentos cada 500 ms
+
+#define timer 10 //timer in minutes
 
 
 RTC_DATA_ATTR bool firstBoot = true;
@@ -27,9 +29,14 @@ const int   daylightOffset_sec = 0;
 
 const char* time_zone = "CET-1CEST,M3.5.0,M10.5.0/3";  // TimeZone rule for Europe/Rome including daylight adjustment rules (optional)
 
+/*
+const char* ssid = "wifitelsur_CBV";
+const char* password = "218709915";
+*/
 
 const char* ssid = "spending_net";
 const char* password = "spending_pass";
+
 
 const char* mqtt_server = "mqtt.eclipseprojects.io";
 const char* topic = "esp32/temperature";
@@ -54,7 +61,7 @@ void try_wifi() {
   
   int count = 0;
   while (WiFi.status() != WL_CONNECTED and count<timeout_wifi) {
-    delay(100);
+    delay(500);
     Serial.print(".");
     
     count += 1;
@@ -144,8 +151,9 @@ String get_measures(){
 
 
 
+
 void setup() {
-        
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
         //Aquí debe tomar la muestra ////////////##################################//////////////////////////////
 
         
@@ -175,11 +183,12 @@ void setup() {
           frame = "["+str_wakeup_time+"][" + measures+"]";
         }
 
-      
-  
+        
+        
         
 
         Serial.begin(115200);
+        
         Serial.println("############$$$$$$$$$$$$$$$$$$$$############$$$$$$$$$$$$##########$$$$$$$$$$$$");
         Serial.println("############$$$$$$$$$$$$$$$$$$$$############$$$$$$$$$$$$##########$$$$$$$$$$$$");
         Serial.println("############$$$$$$$$$$$$$$$$$$$$############$$$$$$$$$$$$##########$$$$$$$$$$$$");
@@ -200,8 +209,15 @@ void setup() {
                 }
                 
                 //Actualiza los relojes de acuerdo a los servicios NTP
-                configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+                                
                 time_NTP_update();
+
+                //Informa al servidor por medio de una publicacion en un topic mqtt
+                // para que el servidor comience a registrar los datos
+                
+                //try_mqtt(topic);
+
+                //corregir funcion topic para que envíe a un topic especial donde escucha el servidor
             
         //Si no es la primera vez intenta conectarse a wifi, pero un timeout asegura no bloquear mas de eso
         }else{
@@ -247,11 +263,13 @@ void setup() {
 
         int t = 0;
         int minu = 0;
+
+         
         
-        if(time_at_sleep.tm_min%10 != 0){
-          minu = 10 - (time_at_sleep.tm_min%10) - 1;
+        if(time_at_sleep.tm_min%timer != 0){
+          minu = timer - (time_at_sleep.tm_min%timer) - 1;
         }else{
-          minu = 9;
+          minu = timer - 1;
         }
 
 
