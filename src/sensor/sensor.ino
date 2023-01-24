@@ -16,7 +16,7 @@ DHT dht(DHTPIN, DHTTYPE);
 #define timeout_wifi 5 // 5 intentos cada 500 ms
 #define timeout_mqtt 5 // 5 intentos cada 500 ms
 
-#define timer 1 //timer in minutes
+#define timer 10 //timer in minutes
 
 
 RTC_DATA_ATTR bool firstBoot = true;

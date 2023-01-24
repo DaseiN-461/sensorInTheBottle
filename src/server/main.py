@@ -3,7 +3,6 @@ import subprocess
 
 def topic_exist(msg):
     # Verifica que el topico no exista
-    flag = False
     with open("./sensors/list.txt", "r") as file:
         lines = file.readlines()
 
@@ -11,14 +10,31 @@ def topic_exist(msg):
                                     # Ya que es mas probable encontrar
 
             if msg.payload.decode("utf-8") + '\n' == line:
-                flag = True
-                return flag
-    return flag
+                print("el topico ya se encuentra registrado")
+                return True
+    print("el topico no se encontraba registrado")
+    return False
 
+def topic_in_whitelist(msg):
+    # El topico está en la whitelist
+    with open("./whitelist.txt", "r") as file:
+        lines = file.readlines()
+
+        for line in lines:
+
+            if msg.payload.decode("utf-8") + '\n' == line:
+                print("El topico se encuentra en la whitelist")
+                return True
+        print("el topico no se encontró en la whitelist")
+        return False
+      
 
 def topic_verify(msg):
+
+
+
     # El topico no existe, procede a registrar el sensor   
-    if topic_exist(msg) == False:        
+    if topic_exist(msg) != True and topic_in_whitelist(msg) == True:        
         
             topic_name = msg.payload.decode("utf-8")
 
@@ -43,8 +59,8 @@ def topic_verify(msg):
 #   
 #            print("\ntopico:[" + msg.payload.decode("utf-8") + "],  añadido satisfactoriamente.")
 #            print("El servidor está a la escucha del sensor mediante el topico mqtt.\n")
-    else:
-        print("El topico ya existe")        
+    #else:
+        # el topico no se encuentra en la whitelist o ya está registrado    
 
 
 # Callback al recibir un mensaje
